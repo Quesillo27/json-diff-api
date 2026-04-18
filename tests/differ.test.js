@@ -117,3 +117,68 @@ test('summary counts are accurate', () => {
   assert.equal(result.summary.changed, 1);
   assert.equal(result.summary.total, 3);
 });
+
+// ── Arrays at top level ───────────────────────────────────────────────────────
+test('accepts arrays as top-level inputs', () => {
+  const result = diff([1, 2, 3], [1, 2, 99]);
+  assert.equal(result.diffs.length, 1);
+  assert.equal(result.diffs[0].type, 'changed');
+  assert.equal(result.diffs[0].from, 3);
+  assert.equal(result.diffs[0].to, 99);
+});
+
+// ── Deeply nested objects ─────────────────────────────────────────────────────
+test('diffs deeply nested structures', () => {
+  const a = { a: { b: { c: { d: 1 } } } };
+  const b = { a: { b: { c: { d: 2 } } } };
+  const result = diff(a, b);
+  assert.equal(result.diffs.length, 1);
+  assert.equal(result.diffs[0].path, 'a.b.c.d');
+  assert.equal(result.diffs[0].from, 1);
+  assert.equal(result.diffs[0].to, 2);
+});
+
+// ── ignoreKeys in nested objects ──────────────────────────────────────────────
+test('ignoreKeys works at nested levels', () => {
+  const a = { user: { name: 'Alice', ts: '2024' } };
+  const b = { user: { name: 'Alice', ts: '2025' } };
+  const result = diff(a, b, { ignoreKeys: ['ts'] });
+  assert.equal(result.identical, true);
+});
+
+// ── Empty objects ─────────────────────────────────────────────────────────────
+test('two empty objects are identical', () => {
+  const result = diff({}, {});
+  assert.equal(result.identical, true);
+  assert.equal(result.summary.total, 0);
+});
+
+test('diff between empty and non-empty object', () => {
+  const result = diff({}, { a: 1 });
+  assert.equal(result.summary.added, 1);
+  assert.equal(result.identical, false);
+});
+
+// ── Boolean values ────────────────────────────────────────────────────────────
+test('detects boolean value change', () => {
+  const result = diff({ active: true }, { active: false });
+  assert.equal(result.diffs[0].type, 'changed');
+  assert.equal(result.diffs[0].from, true);
+  assert.equal(result.diffs[0].to, false);
+});
+
+// ── Mixed array changes ───────────────────────────────────────────────────────
+test('detects multiple array changes correctly', () => {
+  const result = diff({ arr: [1, 2] }, { arr: [1, 2, 3, 4] });
+  assert.equal(result.summary.added, 2);
+  assert.equal(result.diffs[0].path, 'arr[2]');
+  assert.equal(result.diffs[1].path, 'arr[3]');
+});
+
+// ── Type changed from object to array ────────────────────────────────────────
+test('detects type change from object to array', () => {
+  const result = diff({ data: { a: 1 } }, { data: [1, 2] });
+  assert.equal(result.diffs[0].type, 'type_changed');
+  assert.equal(result.diffs[0].from.type, 'object');
+  assert.equal(result.diffs[0].to.type, 'array');
+});
