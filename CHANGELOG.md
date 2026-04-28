@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Corregido
+- `POST /diff/patch` ahora escapa correctamente claves con `/` y `~` usando JSON Pointer RFC 6901, y usa `path: ""` para reemplazos en la raíz del documento.
+- `options.ignoreKeys` ahora valida que todos sus elementos sean strings, también dentro de `POST /diff/batch`, evitando resultados silenciosamente inconsistentes.
+
 ## [1.1.0] - 2026-04-18
 
 ### Añadido

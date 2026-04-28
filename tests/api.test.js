@@ -128,6 +128,17 @@ test('POST /diff returns 400 for invalid options type', async () => {
   assert.equal(body.success, false);
 });
 
+test('POST /diff returns 400 for non-string ignoreKeys items', async () => {
+  const { status, body } = await request('POST', '/diff', {
+    original: { a: 1 },
+    modified: { a: 2 },
+    options: { ignoreKeys: ['a', 123] },
+  });
+  assert.equal(status, 400);
+  assert.equal(body.success, false);
+  assert.ok(body.error.includes('array of strings'));
+});
+
 // ── POST /diff/summary ───────────────────────────────────────────────────────
 
 test('POST /diff/summary returns totals without diffs array', async () => {
@@ -201,6 +212,26 @@ test('POST /diff/patch generates correct pointers for array indices', async () =
   assert.equal(op.value, 99);
 });
 
+test('POST /diff/patch escapes RFC 6901 special characters in keys', async () => {
+  const { status, body } = await request('POST', '/diff/patch', {
+    original: { 'a/b': { '~key': 1 } },
+    modified: { 'a/b': { '~key': 2 } },
+  });
+  assert.equal(status, 200);
+  const op = body.data.patch[0];
+  assert.equal(op.path, '/a~1b/~0key');
+  assert.equal(op.value, 2);
+});
+
+test('POST /diff/patch uses empty pointer for top-level replacement', async () => {
+  const { status, body } = await request('POST', '/diff/patch', {
+    original: {},
+    modified: [],
+  });
+  assert.equal(status, 200);
+  assert.deepEqual(body.data.patch, [{ op: 'replace', path: '', value: [] }]);
+});
+
 test('POST /diff/patch returns 400 when fields are missing', async () => {
   const { status, body } = await request('POST', '/diff/patch', { original: {} });
   assert.equal(status, 400);
@@ -236,6 +267,17 @@ test('POST /diff/batch returns per-item error for invalid pairs', async () => {
   assert.equal(body.data[0].success, true);
   assert.equal(body.data[1].success, false);
   assert.ok(body.data[1].error.includes('"original"'));
+});
+
+test('POST /diff/batch returns per-item error for invalid options', async () => {
+  const { status, body } = await request('POST', '/diff/batch', {
+    pairs: [
+      { original: { a: 1 }, modified: { a: 2 }, options: { ignoreKeys: ['a', false] } },
+    ],
+  });
+  assert.equal(status, 200);
+  assert.equal(body.data[0].success, false);
+  assert.ok(body.data[0].error.includes('array of strings'));
 });
 
 test('POST /diff/batch returns 400 when pairs is not an array', async () => {

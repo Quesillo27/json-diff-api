@@ -2,11 +2,22 @@
 
 const { Router } = require('express');
 const { diff } = require('../differ');
-const { validateDiffBody, validateBatchBody } = require('../middleware/validate');
+const { validateDiffBody, validateBatchBody, validateDiffPayload } = require('../middleware/validate');
 const { batchMaxItems } = require('../config');
 const logger = require('../logger');
 
 const router = Router();
+
+function toJsonPointer(path) {
+  if (!path) return '';
+
+  return path
+    .replace(/\[(\d+)\]/g, '.$1')
+    .split('.')
+    .filter(Boolean)
+    .map(segment => segment.replace(/~/g, '~0').replace(/\//g, '~1'))
+    .join('/');
+}
 
 // POST /diff — full diff with all differences
 router.post('/', validateDiffBody, (req, res) => {
@@ -39,11 +50,10 @@ router.post('/patch', validateDiffBody, (req, res) => {
     const { diffs } = diff(original, modified, options || {});
 
     const patch = diffs.map(d => {
-      const pointer = '/' + d.path.replace(/\./g, '/').replace(/\[(\d+)\]/g, '/$1');
+      const pointer = d.path ? `/${toJsonPointer(d.path)}` : '';
 
       if (d.type === 'added') return { op: 'add', path: pointer, value: d.value };
       if (d.type === 'removed') return { op: 'remove', path: pointer };
-      // Bug fix: type_changed stores values as { type, value } — extract .value for the patch
       if (d.type === 'changed') return { op: 'replace', path: pointer, value: d.to };
       if (d.type === 'type_changed') return { op: 'replace', path: pointer, value: d.to.value };
       return null;
@@ -69,9 +79,12 @@ router.post('/batch', validateBatchBody, (req, res) => {
 
   const results = pairs.map((item, index) => {
     const { original, modified, options } = item;
-    if (original === undefined || modified === undefined) {
-      return { index, success: false, error: 'Both "original" and "modified" are required' };
+    const validationError = validateDiffPayload(item);
+
+    if (validationError) {
+      return { index, success: false, error: validationError };
     }
+
     try {
       return { index, success: true, data: diff(original, modified, options || {}) };
     } catch (err) {

@@ -75,6 +75,8 @@ curl -s -X POST http://localhost:3100/diff/patch \
 # → [{ "op": "replace", "path": "/role", "value": "admin" }]
 ```
 
+Las rutas del patch usan JSON Pointer RFC 6901, por lo que claves con `/` o `~` se escapan correctamente.
+
 ### Comparación en batch
 
 ```bash
@@ -109,6 +111,8 @@ curl -s -X POST http://localhost:3100/diff/batch \
   }
 }
 ```
+
+`options.ignoreKeys` debe ser un arreglo de strings.
 
 ### Body de `/diff/batch`
 
